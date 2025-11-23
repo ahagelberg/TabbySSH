@@ -23,10 +23,10 @@
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel>
                 <GroupBox Header="Startup" Margin="0,0,0,10">
-                    <StackPanel Margin="10">
-                        <CheckBox x:Name="RestoreSessionsCheckBox" Content="Restore active sessions on startup" Margin="0,5"/>
-                    </StackPanel>
-                </GroupBox>
+                <StackPanel Margin="10">
+                    <CheckBox x:Name="RestoreSessionsCheckBox" Content="Restore active sessions on startup" Margin="0,5"/>
+                </StackPanel>
+            </GroupBox>
                 <GroupBox Header="Appearance">
                     <StackPanel Margin="10">
                         <Grid Margin="0,5">
@@ -40,7 +40,7 @@
                         <CheckBox x:Name="UseAccentColorForTitleBarCheckBox" Content="Use active session accent color for title bar" Margin="0,10,0,0"/>
                     </StackPanel>
                 </GroupBox>
-            </StackPanel>
+        </StackPanel>
         </ScrollViewer>
 
         <Grid Grid.Row="2" Margin="0,15,0,0">

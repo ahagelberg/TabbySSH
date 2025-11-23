@@ -1,5 +1,6 @@
 # PowerShell script to build and package TabbySSH for release
 # Usage: .\publish-release.ps1 [version]
+# Version can be with or without 'v' prefix: v1.1.0 or 1.1.0
 
 param(
     [string]$Version = "1.1.0"
@@ -7,7 +8,13 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "Building TabbySSH v$Version for release..." -ForegroundColor Green
+# Normalize version: remove 'v' prefix if present, then add it back
+if ($Version.StartsWith("v")) {
+    $Version = $Version.Substring(1)
+}
+$VersionTag = "v$Version"
+
+Write-Host "Building TabbySSH $VersionTag for release..." -ForegroundColor Green
 
 # Clean previous builds
 Write-Host "Cleaning previous builds..." -ForegroundColor Yellow
@@ -22,17 +29,19 @@ dotnet publish -c Release -r win-x64 `
     -p:EnableCompressionInSingleFile=true `
     -p:DebugType=None `
     -p:DebugSymbols=false `
-    -o ".\publish\TabbySSH-v$Version-win-x64"
+    -o ".\publish\TabbySSH-$VersionTag-win-x64"
 
 # Create zip archive
 Write-Host "Creating zip archive..." -ForegroundColor Yellow
-$zipPath = ".\publish\TabbySSH-v$Version-win-x64.zip"
-Compress-Archive -Path ".\publish\TabbySSH-v$Version-win-x64\*" -DestinationPath $zipPath -Force
+$zipPath = ".\publish\TabbySSH-$VersionTag-win-x64.zip"
+Compress-Archive -Path ".\publish\TabbySSH-$VersionTag-win-x64\*" -DestinationPath $zipPath -Force
 
 Write-Host "`nRelease build complete!" -ForegroundColor Green
 Write-Host "Output: $zipPath" -ForegroundColor Cyan
 Write-Host "`nNext steps:" -ForegroundColor Yellow
-Write-Host "1. Test the executable in .\publish\TabbySSH-v$Version-win-x64\" -ForegroundColor White
-Write-Host "2. Create a GitHub Release and upload: $zipPath" -ForegroundColor White
+Write-Host "1. Test the executable in .\publish\TabbySSH-$VersionTag-win-x64\" -ForegroundColor White
+Write-Host "2. Create a Git tag: git tag $VersionTag" -ForegroundColor White
+Write-Host "3. Push the tag: git push origin $VersionTag" -ForegroundColor White
+Write-Host "4. Or manually create a GitHub Release and upload: $zipPath" -ForegroundColor White
 
 

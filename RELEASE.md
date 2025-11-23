@@ -9,9 +9,11 @@ public const string Version = "1.2.0";  // Update this
 ```
 
 ### 2. Build Release
-Run the publish script:
+Run the publish script (version can be with or without 'v' prefix):
 ```powershell
 .\publish-release.ps1 1.2.0
+# or
+.\publish-release.ps1 v1.2.0
 ```
 
 Or manually:

@@ -36,22 +36,22 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <Menu Grid.Column="0" Background="Transparent" Foreground="{DynamicResource MenuForeground}" VerticalAlignment="Center" IsHitTestVisible="True" HorizontalAlignment="Left">
-                    <MenuItem Header="_File">
+            <MenuItem Header="_File">
                         <MenuItem Header="_New Session" x:Name="NewTabMenuItem" Click="NewTabMenuItem_Click" InputGestureText="Ctrl+T"/>
                         <MenuItem Header="_Close Session" x:Name="CloseTabMenuItem" Click="CloseTabMenuItem_Click" InputGestureText="Ctrl+W"/>
                         <Separator/>
                         <MenuItem Header="_Options..." x:Name="OptionsMenuItem" Click="OptionsMenuItem_Click"/>
-                        <Separator/>
-                        <MenuItem Header="E_xit" Click="ExitMenuItem_Click"/>
-                    </MenuItem>
-                    <MenuItem Header="_View">
-                        <MenuItem Header="_Next Tab" x:Name="NextTabMenuItem" Click="NextTabMenuItem_Click" InputGestureText="Ctrl+Tab"/>
-                        <MenuItem Header="_Previous Tab" x:Name="PreviousTabMenuItem" Click="PreviousTabMenuItem_Click" InputGestureText="Ctrl+Shift+Tab"/>
-                    </MenuItem>
-                    <MenuItem Header="_Help">
-                        <MenuItem Header="_About..." x:Name="AboutMenuItem" Click="AboutMenuItem_Click"/>
-                    </MenuItem>
-                </Menu>
+                <Separator/>
+                <MenuItem Header="E_xit" Click="ExitMenuItem_Click"/>
+            </MenuItem>
+            <MenuItem Header="_View">
+                <MenuItem Header="_Next Tab" x:Name="NextTabMenuItem" Click="NextTabMenuItem_Click" InputGestureText="Ctrl+Tab"/>
+                <MenuItem Header="_Previous Tab" x:Name="PreviousTabMenuItem" Click="PreviousTabMenuItem_Click" InputGestureText="Ctrl+Shift+Tab"/>
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="_About..." x:Name="AboutMenuItem" Click="AboutMenuItem_Click"/>
+            </MenuItem>
+        </Menu>
                 <TextBlock Grid.Column="1" 
                            VerticalAlignment="Center"
                            HorizontalAlignment="Center"
