@@ -6,6 +6,26 @@ TabbySSH is a multi-tab SSH terminal client for Windows built with WPF and .NET.
 
 TabbySSH allows you to connect to remote servers via SSH and manage multiple terminal sessions in a single window using tabs. Each session can be configured with custom settings, colors, and connection options. Sessions can be organized into groups and saved for quick access.
 
+## Why TabbySSH Was Created
+
+TabbySSH was created to solve usability annoyances present in PuTTY and multi-tab wrappers for PuTTY:
+
+### Alt+Tab Not Working as Expected
+PuTTY and all tested wrappers require double-tap on Tab when using Alt+Tab, making window switching frustrating. TabbySSH handles window focus correctly so Alt+Tab works on the first press.
+
+### Disconnected Terminal Dialog Boxes
+When a terminal disconnects, PuTTY shows a pop-up dialog box that must be clicked to close, interrupting workflow. TabbySSH handles disconnections gracefully without blocking modal dialogs.
+This pop-up is even more annoying in wrapper programs blocking reconnecting until it's been closed, and it can't be closed with the keyboard as it isn't focused by default.
+
+### Inconsistent Tab Navigation
+Ctrl+Tab and Ctrl+Shift+Tab don't work consistently in PuTTY wrappers, making it difficult to switch between tabs in a predictable order. TabbySSH provides reliable tab navigation that cycles through tabs consistently.
+
+### Non-Optimal Default Settings
+PuTTY's default settings are not optimal for modern use and can be quirky to configure. TabbySSH uses sensible defaults.
+
+### No Visual Differentiation Between Servers
+It is awkward or impossible to set custom colors for individual servers/sessions in PuTTY wrappers, making it difficult to quickly identify which server you're connected to when managing multiple sessions. TabbySSH allows per-session custom colors (foreground, background, and accent) for instant visual identification.
+
 ## Features
 
 ### Core Functionality
@@ -54,26 +74,6 @@ TabbySSH allows you to connect to remote servers via SSH and manage multiple ter
 - **Session Organization**: Group sessions into folders for better organization
 - **Context Menus**: Right-click support for session management
 - **Window State Persistence**: Remembers window size and position
-
-## Why TabbySSH Was Created
-
-TabbySSH was created to solve usability annoyances present in PuTTY and multi-tab wrappers for PuTTY:
-
-### Alt+Tab Not Working as Expected
-PuTTY and all tested wrappers require double-tap on Tab when using Alt+Tab, making window switching frustrating. TabbySSH handles window focus correctly so Alt+Tab works on the first press.
-
-### Disconnected Terminal Dialog Boxes
-When a terminal disconnects, PuTTY shows a pop-up dialog box that must be clicked to close, interrupting workflow. TabbySSH handles disconnections gracefully without blocking modal dialogs.
-This pop-up is even more annoying in wrapper programs blocking reconnecting until it's been closed, and it can't be closed with the keyboard as it isn't focused by default.
-
-### Inconsistent Tab Navigation
-Ctrl+Tab and Ctrl+Shift+Tab don't work consistently in PuTTY wrappers, making it difficult to switch between tabs in a predictable order. TabbySSH provides reliable tab navigation that cycles through tabs consistently.
-
-### Non-Optimal Default Settings
-PuTTY's default settings are not optimal for modern use and can be quirky to configure. TabbySSH uses sensible defaults.
-
-### No Visual Differentiation Between Servers
-It is awkward or impossible to set custom colors for individual servers/sessions in PuTTY wrappers, making it difficult to quickly identify which server you're connected to when managing multiple sessions. TabbySSH allows per-session custom colors (foreground, background, and accent) for instant visual identification.
 
 ## Requirements
 
