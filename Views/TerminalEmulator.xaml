@@ -15,7 +15,8 @@
             <Canvas x:Name="TerminalCanvas" 
                     Background="Black"
                     Focusable="False"
-                    ClipToBounds="True"/>
+                    ClipToBounds="True"
+                    IsHitTestVisible="True"/>
         </ScrollViewer>
         <Rectangle x:Name="FlashOverlay" 
                    Fill="White" 

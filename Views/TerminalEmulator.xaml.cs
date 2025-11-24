@@ -27,9 +27,11 @@ public partial class TerminalEmulator : UserControl
     private DispatcherTimer? _renderTimer;
     private bool _pendingRender = false;
     private bool _isSelecting = false;
-    private Point? _selectionStart;
-    private Point? _selectionEnd;
-    private Rectangle? _selectionOverlay;
+    private bool _hasSelection = false;
+    private int? _selectionStartRow;
+    private int? _selectionStartCol;
+    private int? _selectionEndRow;
+    private int? _selectionEndCol;
     private Rectangle? _lineFlashOverlay;
     private string _lineEnding = "\n";
 
@@ -40,13 +42,15 @@ public partial class TerminalEmulator : UserControl
         SizeChanged += TerminalEmulator_SizeChanged;
         PreviewKeyDown += TerminalEmulator_PreviewKeyDown;
         TextInput += TerminalEmulator_TextInput;
+        KeyDown += TerminalEmulator_KeyDown;
         PreviewMouseDown += TerminalEmulator_PreviewMouseDown;
+        MouseDown += TerminalEmulator_MouseDown;
         PreviewMouseMove += TerminalEmulator_PreviewMouseMove;
         PreviewMouseUp += TerminalEmulator_PreviewMouseUp;
-        KeyDown += TerminalEmulator_KeyDown;
         KeyUp += TerminalEmulator_KeyUp;
         MouseWheel += TerminalEmulator_MouseWheel;
         ContextMenuOpening += TerminalEmulator_ContextMenuOpening;
+        ContextMenu = null;
         Focusable = true;
         
         _renderTimer = new DispatcherTimer
@@ -132,7 +136,10 @@ public partial class TerminalEmulator : UserControl
         UpdateTerminalSize();
         RenderScreen();
         Focus();
+        
+        // Mouse events are handled at UserControl level via PreviewMouseDown/Move/Up
     }
+    
 
     private void TerminalEmulator_SizeChanged(object sender, SizeChangedEventArgs e)
     {
@@ -572,10 +579,8 @@ public partial class TerminalEmulator : UserControl
         var currentCursorRow = _emulator.CursorRow;
         var currentCursorCol = _emulator.CursorCol;
 
-        var selectionOverlay = _selectionOverlay;
         var lineFlashOverlay = _lineFlashOverlay;
         TerminalCanvas.Children.Clear();
-        _selectionOverlay = null;
         _lineFlashOverlay = null;
 
         var startRow = Math.Max(0, _scrollOffset);
@@ -589,13 +594,6 @@ public partial class TerminalEmulator : UserControl
         if (_scrollOffset == 0)
         {
             RenderCursor();
-        }
-
-        if (selectionOverlay != null && _isSelecting)
-        {
-            _selectionOverlay = selectionOverlay;
-            TerminalCanvas.Children.Add(_selectionOverlay);
-            UpdateSelection();
         }
 
         if (lineFlashOverlay != null && lineFlashOverlay.Visibility == Visibility.Visible)
@@ -628,6 +626,7 @@ public partial class TerminalEmulator : UserControl
             var currentConceal = false;
             var x = 0.0;
             var textRun = "";
+            var textRunStartCol = 0;
 
         for (int col = 0; col < _emulator.Cols; col++)
         {
@@ -653,20 +652,21 @@ public partial class TerminalEmulator : UserControl
             var doubleUnderline = cell.DoubleUnderline;
             var overline = cell.Overline;
             var conceal = cell.Conceal;
-
+            
             if (fg != currentFg || bg != currentBg || bold != currentBold || italic != currentItalic || 
                 underline != currentUnderline || faint != currentFaint || crossedOut != currentCrossedOut ||
                 doubleUnderline != currentDoubleUnderline || overline != currentOverline || conceal != currentConceal || col == _emulator.Cols - 1)
             {
                 if (!string.IsNullOrEmpty(textRun))
                 {
-                    RenderTextSegment(x, y, textRun, currentFg, currentBg, currentBold, currentItalic, currentUnderline, currentFaint, currentCrossedOut, currentDoubleUnderline, currentOverline, currentConceal);
+                    RenderTextSegment(x, y, textRun, currentFg, currentBg, currentBold, currentItalic, currentUnderline, currentFaint, currentCrossedOut, currentDoubleUnderline, currentOverline, currentConceal, textRunStartCol, row);
                     x += textRun.Length * _charWidth;
                 }
 
                 if (col < _emulator.Cols - 1)
                 {
                     textRun = cell.Character.ToString();
+                    textRunStartCol = col;
                     currentFg = fg;
                     currentBg = bg;
                     currentBold = bold;
@@ -687,11 +687,47 @@ public partial class TerminalEmulator : UserControl
 
         if (!string.IsNullOrEmpty(textRun))
         {
-            RenderTextSegment(x, y, textRun, currentFg, currentBg, currentBold, currentItalic, currentUnderline, currentFaint, currentCrossedOut, currentDoubleUnderline, currentOverline, currentConceal);
+            RenderTextSegment(x, y, textRun, currentFg, currentBg, currentBold, currentItalic, currentUnderline, currentFaint, currentCrossedOut, currentDoubleUnderline, currentOverline, currentConceal, textRunStartCol, row);
         }
     }
 
-    private void RenderTextSegment(double x, double y, string text, int fgColor, int bgColor, bool bold, bool italic, bool underline, bool faint, bool crossedOut, bool doubleUnderline, bool overline, bool conceal)
+    private bool IsCellSelected(int row, int col)
+    {
+        if (!_selectionStartRow.HasValue || !_selectionStartCol.HasValue || 
+            !_selectionEndRow.HasValue || !_selectionEndCol.HasValue)
+        {
+            return false;
+        }
+
+        var startRow = Math.Min(_selectionStartRow.Value, _selectionEndRow.Value);
+        var endRow = Math.Max(_selectionStartRow.Value, _selectionEndRow.Value);
+        var startCol = Math.Min(_selectionStartCol.Value, _selectionEndCol.Value);
+        var endCol = Math.Max(_selectionStartCol.Value, _selectionEndCol.Value);
+
+        if (row < startRow || row > endRow)
+        {
+            return false;
+        }
+
+        if (row == startRow && row == endRow)
+        {
+            return col >= startCol && col < endCol;
+        }
+
+        if (row == startRow)
+        {
+            return col >= startCol;
+        }
+
+        if (row == endRow)
+        {
+            return col < endCol;
+        }
+
+        return true;
+    }
+
+    private void RenderTextSegment(double x, double y, string text, int fgColor, int bgColor, bool bold, bool italic, bool underline, bool faint, bool crossedOut, bool doubleUnderline, bool overline, bool conceal, int startCol, int row)
     {
         if (_typeface == null || string.IsNullOrEmpty(text))
         {
@@ -708,6 +744,131 @@ public partial class TerminalEmulator : UserControl
         var fontWeight = bold ? FontWeights.Bold : FontWeights.Normal;
         var fontStyle = italic ? FontStyles.Italic : FontStyles.Normal;
 
+        // Check if this text segment crosses selection boundary - only split if necessary
+        if ((_hasSelection || _isSelecting) && text.Length > 1)
+        {
+            // Check if segment has mixed selection state
+            bool firstCharSelected = IsCellSelected(row, startCol);
+            bool needsSplit = false;
+            
+            for (int i = 1; i < text.Length; i++)
+            {
+                if (IsCellSelected(row, startCol + i) != firstCharSelected)
+                {
+                    needsSplit = true;
+                    break;
+                }
+            }
+            
+            // If all characters have same selection state, render normally
+            if (!needsSplit)
+            {
+                if (firstCharSelected)
+                {
+                    var temp = foreground;
+                    foreground = background;
+                    background = temp;
+                }
+            }
+            else
+            {
+                // Split and render character by character only for mixed segments
+                for (int i = 0; i < text.Length; i++)
+                {
+                    var charCol = startCol + i;
+                    var cellIsSelected = IsCellSelected(row, charCol);
+                    
+                    // Calculate exact position based on column index to avoid accumulation errors
+                    var charX = charCol * _charWidth;
+                    
+                    var charForeground = cellIsSelected ? background : foreground;
+                    var charBackground = cellIsSelected ? foreground : background;
+
+                    if (conceal)
+                    {
+                        charForeground = charBackground;
+                    }
+                    else if (faint && charForeground is SolidColorBrush fgBrush)
+                    {
+                        var color = fgBrush.Color;
+                        var fadedColor = Color.FromArgb(color.A, (byte)(color.R * 0.5), (byte)(color.G * 0.5), (byte)(color.B * 0.5));
+                        charForeground = new SolidColorBrush(fadedColor);
+                    }
+
+                    var charBgRect = new Rectangle
+                    {
+                        Width = _charWidth + 0.1,
+                        Height = _charHeight,
+                        Fill = charBackground,
+                        SnapsToDevicePixels = true
+                    };
+                    Canvas.SetLeft(charBgRect, charX);
+                    Canvas.SetTop(charBgRect, y);
+                    TerminalCanvas.Children.Add(charBgRect);
+
+                    var charTextBlock = new TextBlock
+                    {
+                        Text = text[i].ToString(),
+                        Foreground = charForeground,
+                        FontFamily = _typeface.FontFamily,
+                        FontSize = _fontSize,
+                        FontWeight = fontWeight,
+                        FontStyle = fontStyle,
+                        TextDecorations = new TextDecorationCollection(),
+                        SnapsToDevicePixels = true
+                    };
+
+                    if (underline || doubleUnderline)
+                    {
+                        charTextBlock.TextDecorations.Add(TextDecorations.Underline);
+                    }
+
+                    if (overline)
+                    {
+                        charTextBlock.TextDecorations.Add(TextDecorations.OverLine);
+                    }
+
+                    if (crossedOut)
+                    {
+                        charTextBlock.TextDecorations.Add(TextDecorations.Strikethrough);
+                    }
+
+                    Canvas.SetLeft(charTextBlock, charX);
+                    Canvas.SetTop(charTextBlock, y);
+                    TerminalCanvas.Children.Add(charTextBlock);
+
+                    if (doubleUnderline)
+                    {
+                        var underlineRect = new Rectangle
+                        {
+                            Width = _charWidth,
+                            Height = 1,
+                            Fill = charForeground
+                        };
+                        Canvas.SetLeft(underlineRect, charX);
+                        Canvas.SetTop(underlineRect, y + _charHeight - 3);
+                        TerminalCanvas.Children.Add(underlineRect);
+                    }
+                }
+                return;
+            }
+        }
+
+        // For single character or no selection, render normally
+        bool charIsSelected = false;
+        if ((_hasSelection || _isSelecting) && text.Length == 1)
+        {
+            charIsSelected = IsCellSelected(row, startCol);
+        }
+
+        // Invert colors if selected
+        if (charIsSelected)
+        {
+            var temp = foreground;
+            foreground = background;
+            background = temp;
+        }
+
         if (conceal)
         {
             foreground = background;
@@ -723,7 +884,8 @@ public partial class TerminalEmulator : UserControl
         {
             Width = text.Length * _charWidth,
             Height = _charHeight,
-            Fill = background
+            Fill = background,
+            SnapsToDevicePixels = true
         };
         Canvas.SetLeft(bgRect, x);
         Canvas.SetTop(bgRect, y);
@@ -850,115 +1012,301 @@ public partial class TerminalEmulator : UserControl
 
     private void TerminalEmulator_PreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
-        Focus();
-        
         if (e.LeftButton == MouseButtonState.Pressed)
         {
-            _isSelecting = true;
+            // Check if click is over the Canvas
             var pos = e.GetPosition(TerminalCanvas);
-            _selectionStart = pos;
-            _selectionEnd = pos;
-            ClearSelection();
-            UpdateSelection();
+            if (pos.X >= 0 && pos.Y >= 0 && pos.X <= TerminalCanvas.ActualWidth && pos.Y <= TerminalCanvas.ActualHeight && _emulator != null && _charWidth > 0 && _charHeight > 0)
+            {
+                Focus();
+                
+                // If there's already a selection and we're clicking, copy it (PuTTY behavior)
+                if (_hasSelection && !_isSelecting)
+                {
+                    CopySelectionToClipboard();
+                    ClearSelection();
+                    _hasSelection = false;
+                }
+                
+                // Calculate cell position
+                var col = Math.Max(0, Math.Min(_emulator.Cols - 1, (int)(pos.X / _charWidth)));
+                var row = Math.Max(0, (int)(pos.Y / _charHeight) + _scrollOffset);
+                
+                // Handle double-click (word selection) and triple-click (line selection)
+                if (e.ClickCount == 2)
+                {
+                    // Double-click: select word
+                    SelectWordAt(row, col);
+                    e.Handled = true;
+                    return;
+                }
+                else if (e.ClickCount == 3)
+                {
+                    // Triple-click: select line
+                    SelectLineAt(row);
+                    e.Handled = true;
+                    return;
+                }
+                
+                // Start new selection
+                _isSelecting = true;
+                _selectionStartRow = row;
+                _selectionStartCol = col;
+                _selectionEndRow = row;
+                _selectionEndCol = col;
+                
+                ScheduleRender();
+                
+                // Capture mouse and set cursor
+                CaptureMouse();
+                Cursor = Cursors.IBeam;
+                e.Handled = true;
+            }
         }
         else if (e.RightButton == MouseButtonState.Pressed)
         {
-            if (!_isSelecting)
+            // Always handle right-click to prevent context menu from appearing
+            var pos = e.GetPosition(TerminalCanvas);
+            if (pos.X >= 0 && pos.Y >= 0 && pos.X <= TerminalCanvas.ActualWidth && pos.Y <= TerminalCanvas.ActualHeight)
             {
-                PasteFromClipboard();
+                if (!_isSelecting && !_hasSelection)
+                {
+                    PasteFromClipboard();
+                }
                 e.Handled = true;
             }
         }
     }
-
-    private void TerminalEmulator_PreviewMouseMove(object sender, MouseEventArgs e)
+    
+    private void TerminalEmulator_MouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (_isSelecting && e.LeftButton == MouseButtonState.Pressed)
+        // Handle right-click at MouseDown level to prevent context menu
+        if (e.RightButton == MouseButtonState.Pressed)
         {
             var pos = e.GetPosition(TerminalCanvas);
-            _selectionEnd = pos;
-            UpdateSelection();
+            if (pos.X >= 0 && pos.Y >= 0 && pos.X <= TerminalCanvas.ActualWidth && pos.Y <= TerminalCanvas.ActualHeight)
+            {
+                e.Handled = true;
+            }
         }
     }
-
+    
+    private void TerminalEmulator_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        // Prevent context menu from opening in terminal area
+        e.Handled = true;
+    }
+    
+    private void TerminalEmulator_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_isSelecting && e.LeftButton == MouseButtonState.Pressed && _emulator != null && _charWidth > 0 && _charHeight > 0)
+        {
+            var pos = e.GetPosition(TerminalCanvas);
+            var col = Math.Max(0, Math.Min(_emulator.Cols - 1, (int)(pos.X / _charWidth)));
+            var row = Math.Max(0, (int)(pos.Y / _charHeight) + _scrollOffset);
+            
+            if (_selectionEndRow != row || _selectionEndCol != col)
+            {
+                _selectionEndRow = row;
+                _selectionEndCol = col;
+                ScheduleRender();
+            }
+            
+            Cursor = Cursors.IBeam;
+            e.Handled = true;
+        }
+        else if (!_isSelecting && !_hasSelection)
+        {
+            // Set IBeam cursor when hovering over terminal
+            Cursor = Cursors.IBeam;
+        }
+    }
+    
     private void TerminalEmulator_PreviewMouseUp(object sender, MouseButtonEventArgs e)
     {
         if (e.LeftButton == MouseButtonState.Released && _isSelecting)
         {
             _isSelecting = false;
-            if (_selectionStart.HasValue && _selectionEnd.HasValue)
+            ReleaseMouseCapture();
+            
+            // Check if we actually have a selection (not just a click)
+            if (_selectionStartRow.HasValue && _selectionStartCol.HasValue && 
+                _selectionEndRow.HasValue && _selectionEndCol.HasValue)
             {
-                CopySelectionToClipboard();
+                var startRow = Math.Min(_selectionStartRow.Value, _selectionEndRow.Value);
+                var endRow = Math.Max(_selectionStartRow.Value, _selectionEndRow.Value);
+                var startCol = Math.Min(_selectionStartCol.Value, _selectionEndCol.Value);
+                var endCol = Math.Max(_selectionStartCol.Value, _selectionEndCol.Value);
+                
+                // Only mark as having selection if there's actual area selected
+                if (endRow > startRow || (endRow == startRow && endCol > startCol))
+                {
+                    _hasSelection = true;
+                }
+                else
+                {
+                    // Just a click, clear selection
+                    ClearSelection();
+                    _hasSelection = false;
+                }
             }
+            
+            e.Handled = true;
         }
     }
 
     private void ClearSelection()
     {
-        if (_selectionOverlay != null)
-        {
-            TerminalCanvas.Children.Remove(_selectionOverlay);
-            _selectionOverlay = null;
-        }
-        _selectionStart = null;
-        _selectionEnd = null;
+        _selectionStartRow = null;
+        _selectionStartCol = null;
+        _selectionEndRow = null;
+        _selectionEndCol = null;
+        _hasSelection = false;
     }
-
-    private void TerminalEmulator_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    
+    private void SelectWordAt(int row, int col)
     {
-        var menu = new ContextMenu();
-        var pasteItem = new MenuItem { Header = "Paste" };
-        pasteItem.Click += (s, args) => PasteFromClipboard();
-        menu.Items.Add(pasteItem);
-        ContextMenu = menu;
-    }
-
-    private void UpdateSelection()
-    {
-        if (!_selectionStart.HasValue || !_selectionEnd.HasValue || _emulator == null || _charWidth == 0 || _charHeight == 0)
+        if (_emulator == null) return;
+        
+        TerminalCell cell;
+        if (row < _emulator.Rows)
         {
-            return;
+            cell = _emulator.GetCell(row, col);
         }
-
-        var startX = Math.Min(_selectionStart.Value.X, _selectionEnd.Value.X);
-        var endX = Math.Max(_selectionStart.Value.X, _selectionEnd.Value.X);
-        var startY = Math.Min(_selectionStart.Value.Y, _selectionEnd.Value.Y);
-        var endY = Math.Max(_selectionStart.Value.Y, _selectionEnd.Value.Y);
-
-        if (_selectionOverlay == null)
+        else
         {
-            _selectionOverlay = new Rectangle
+            var scrollbackRow = row - _emulator.Rows;
+            cell = _emulator.GetScrollbackCell(scrollbackRow, col);
+        }
+        
+        // Check if we're on a word character (non-whitespace)
+        bool isWordChar = !char.IsWhiteSpace(cell.Character);
+        
+        int startCol = col;
+        int endCol = col;
+        
+        if (isWordChar)
+        {
+            // Find start of word (go left until we hit whitespace or start of line)
+            while (startCol > 0)
             {
-                Fill = new SolidColorBrush(Color.FromArgb(100, 255, 255, 255)),
-                Stroke = Brushes.White,
-                StrokeThickness = 1
-            };
-            TerminalCanvas.Children.Add(_selectionOverlay);
+                TerminalCell leftCell;
+                if (row < _emulator.Rows)
+                {
+                    leftCell = _emulator.GetCell(row, startCol - 1);
+                }
+                else
+                {
+                    var scrollbackRow = row - _emulator.Rows;
+                    leftCell = _emulator.GetScrollbackCell(scrollbackRow, startCol - 1);
+                }
+                
+                if (char.IsWhiteSpace(leftCell.Character))
+                {
+                    break;
+                }
+                startCol--;
+            }
+            
+            // Find end of word (go right until we hit whitespace or end of line)
+            while (endCol < _emulator.Cols - 1)
+            {
+                TerminalCell rightCell;
+                if (row < _emulator.Rows)
+                {
+                    rightCell = _emulator.GetCell(row, endCol + 1);
+                }
+                else
+                {
+                    var scrollbackRow = row - _emulator.Rows;
+                    rightCell = _emulator.GetScrollbackCell(scrollbackRow, endCol + 1);
+                }
+                
+                if (char.IsWhiteSpace(rightCell.Character))
+                {
+                    break;
+                }
+                endCol++;
+            }
+            endCol++; // Include the last character
         }
-
-        Canvas.SetLeft(_selectionOverlay, startX);
-        Canvas.SetTop(_selectionOverlay, startY);
-        _selectionOverlay.Width = endX - startX;
-        _selectionOverlay.Height = endY - startY;
+        else
+        {
+            // If on whitespace, select just that character
+            endCol++;
+        }
+        
+        _selectionStartRow = row;
+        _selectionStartCol = startCol;
+        _selectionEndRow = row;
+        _selectionEndCol = endCol;
+        _hasSelection = true;
+        _isSelecting = false;
+        
+        ScheduleRender();
+    }
+    
+    private void SelectLineAt(int row)
+    {
+        if (_emulator == null) return;
+        
+        // Select entire line from column 0 to end
+        _selectionStartRow = row;
+        _selectionStartCol = 0;
+        _selectionEndRow = row;
+        _selectionEndCol = _emulator.Cols;
+        _hasSelection = true;
+        _isSelecting = false;
+        
+        ScheduleRender();
     }
 
     private void CopySelectionToClipboard()
     {
-        if (!_selectionStart.HasValue || !_selectionEnd.HasValue || _emulator == null || _charWidth == 0 || _charHeight == 0)
+        if (!_selectionStartRow.HasValue || !_selectionStartCol.HasValue || 
+            !_selectionEndRow.HasValue || !_selectionEndCol.HasValue || _emulator == null)
         {
             return;
         }
 
-        var startCol = Math.Max(0, (int)(Math.Min(_selectionStart.Value.X, _selectionEnd.Value.X) / _charWidth));
-        var endCol = Math.Min(_emulator.Cols, (int)(Math.Max(_selectionStart.Value.X, _selectionEnd.Value.X) / _charWidth) + 1);
-        var startRow = Math.Max(0, (int)(Math.Min(_selectionStart.Value.Y, _selectionEnd.Value.Y) / _charHeight) + _scrollOffset);
-        var endRow = Math.Min(_emulator.Rows + _emulator.ScrollbackLineCount, (int)(Math.Max(_selectionStart.Value.Y, _selectionEnd.Value.Y) / _charHeight) + _scrollOffset + 1);
+        var startRow = Math.Min(_selectionStartRow.Value, _selectionEndRow.Value);
+        var endRow = Math.Max(_selectionStartRow.Value, _selectionEndRow.Value);
+        var startCol = Math.Min(_selectionStartCol.Value, _selectionEndCol.Value);
+        var endCol = Math.Max(_selectionStartCol.Value, _selectionEndCol.Value);
 
         var selectedText = new System.Text.StringBuilder();
-        for (int row = startRow; row < endRow; row++)
+        for (int row = startRow; row <= endRow; row++)
         {
             var lineText = new System.Text.StringBuilder();
-            for (int col = startCol; col < endCol; col++)
+            
+            // Determine column range for this row
+            int rowStartCol, rowEndCol;
+            if (row == startRow && row == endRow)
+            {
+                // Single line selection
+                rowStartCol = startCol;
+                rowEndCol = endCol;
+            }
+            else if (row == startRow)
+            {
+                // First line - from startCol to end of line
+                rowStartCol = startCol;
+                rowEndCol = _emulator.Cols;
+            }
+            else if (row == endRow)
+            {
+                // Last line - from start of line to endCol
+                rowStartCol = 0;
+                rowEndCol = endCol;
+            }
+            else
+            {
+                // Middle lines - entire line
+                rowStartCol = 0;
+                rowEndCol = _emulator.Cols;
+            }
+            
+            for (int col = rowStartCol; col < rowEndCol && col < _emulator.Cols; col++)
             {
                 TerminalCell cell;
                 if (row < _emulator.Rows)
@@ -972,9 +1320,24 @@ public partial class TerminalEmulator : UserControl
                 }
                 lineText.Append(cell.Character);
             }
+            
             if (lineText.Length > 0)
             {
-                selectedText.AppendLine(lineText.ToString().TrimEnd());
+                var lineStr = lineText.ToString();
+                // Only trim trailing spaces, not all whitespace
+                lineStr = lineStr.TrimEnd(' ');
+                if (row < endRow)
+                {
+                    selectedText.AppendLine(lineStr);
+                }
+                else
+                {
+                    selectedText.Append(lineStr);
+                }
+            }
+            else if (row < endRow)
+            {
+                selectedText.AppendLine();
             }
         }
 
@@ -1027,6 +1390,12 @@ public partial class TerminalEmulator : UserControl
         if (_connection == null || !_connection.IsConnected)
         {
             return;
+        }
+
+        // Clear selection when typing
+        if (_hasSelection)
+        {
+            ClearSelection();
         }
 
         if (!string.IsNullOrEmpty(e.Text))
@@ -1111,7 +1480,18 @@ public partial class TerminalEmulator : UserControl
 
         if (key == Key.C && (modifiers & ModifierKeys.Control) == ModifierKeys.Control && (modifiers & ModifierKeys.Shift) == ModifierKeys.Shift)
         {
-            if (_selectionStart.HasValue && _selectionEnd.HasValue)
+            if (_selectionStartRow.HasValue && _selectionStartCol.HasValue && _selectionEndRow.HasValue && _selectionEndCol.HasValue)
+            {
+                CopySelectionToClipboard();
+            }
+            e.Handled = true;
+            return;
+        }
+
+        // Ctrl+Insert for copy (Windows Terminal behavior)
+        if (key == Key.Insert && (modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+        {
+            if (_selectionStartRow.HasValue && _selectionStartCol.HasValue && _selectionEndRow.HasValue && _selectionEndCol.HasValue)
             {
                 CopySelectionToClipboard();
             }
@@ -1329,6 +1709,12 @@ public partial class TerminalEmulator : UserControl
 
         if (sequence != null)
         {
+            // Clear selection when sending keys to terminal
+            if (_hasSelection)
+            {
+                ClearSelection();
+            }
+            
             try
             {
                 await _connection.WriteAsync(sequence);
@@ -1349,6 +1735,12 @@ public partial class TerminalEmulator : UserControl
         if (_emulator == null)
         {
             return;
+        }
+
+        // Clear selection when scrolling
+        if (_hasSelection)
+        {
+            ClearSelection();
         }
 
         var delta = e.Delta > 0 ? -3 : 3;
