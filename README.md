@@ -27,6 +27,10 @@ PuTTY's default settings are not optimal for modern use and can be quirky to con
 ### No Visual Differentiation Between Servers
 It is awkward or impossible to set custom colors for individual servers/sessions in PuTTY wrappers, making it difficult to quickly identify which server you're connected to when managing multiple sessions. TabbySSH allows per-session custom colors (foreground, background, and accent) for instant visual identification.
 
+### No support for multiple displays with different scales
+The multi-tab programs tested did not handle multiple displays with different scale factors making the text too small
+or large and blurry on one of the displays.
+
 ## Features
 
 ### Core Functionality
