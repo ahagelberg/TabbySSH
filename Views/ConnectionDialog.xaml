@@ -310,7 +310,7 @@
 
         <GroupBox x:Name="ForwardingGroupBox" Header="Forwarding" Margin="0,0,0,10">
             <StackPanel Margin="10">
-                <CheckBox x:Name="X11ForwardingCheckBox" Content="Enable X11 Forwarding" Margin="0,5" IsChecked="True"/>
+                <CheckBox x:Name="X11ForwardingCheckBox" Content="Enable X11 Forwarding" Margin="0,5" IsChecked="False"/>
                 <TextBlock Text="Port Forwarding" FontWeight="Bold" Margin="0,15,0,5"/>
                 <DataGrid x:Name="PortForwardingDataGrid" AutoGenerateColumns="False" CanUserAddRows="True" CanUserDeleteRows="True" Height="150" Margin="0,5">
                     <DataGrid.Columns>

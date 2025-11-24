@@ -30,7 +30,7 @@ public class SshSessionConfiguration : SessionConfiguration
     public int KeepAliveInterval { get; set; } = DEFAULT_KEEPALIVE_INTERVAL;
     public int ConnectionTimeout { get; set; } = DEFAULT_CONNECTION_TIMEOUT;
     public bool CompressionEnabled { get; set; } = true;
-    public bool X11ForwardingEnabled { get; set; } = true;
+    public bool X11ForwardingEnabled { get; set; } = false;
     public string BellNotification { get; set; } = "Line Flash";
     public List<PortForwardingRule> PortForwardingRules { get; set; } = new();
     
