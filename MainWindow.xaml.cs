@@ -264,6 +264,8 @@ public partial class MainWindow : Window
                 sshConfig.KeepAliveInterval = newConfig.KeepAliveInterval;
                 sshConfig.ConnectionTimeout = newConfig.ConnectionTimeout;
                 sshConfig.CompressionEnabled = newConfig.CompressionEnabled;
+                sshConfig.ResetScrollOnUserInput = newConfig.ResetScrollOnUserInput;
+                sshConfig.ResetScrollOnServerOutput = newConfig.ResetScrollOnServerOutput;
                 sshConfig.X11ForwardingEnabled = newConfig.X11ForwardingEnabled;
                 sshConfig.BellNotification = newConfig.BellNotification;
                 sshConfig.Color = newConfig.Color;

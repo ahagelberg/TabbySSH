@@ -18,6 +18,7 @@ public partial class TerminalEmulator : UserControl
     private const int DEFAULT_SCROLLBACK_LINES = 20000;
     private const int RENDER_THROTTLE_MS = 33; // ~30 FPS for smoother scrolling
     private const int SCROLL_LINES_PER_TICK = 3;
+    private const int ECHO_DETECTION_WINDOW_MS = 100; // Time window to detect echoed user input
 
     private Vt100Emulator? _emulator;
     private ITerminalConnection? _connection;
@@ -38,6 +39,7 @@ public partial class TerminalEmulator : UserControl
     private string _lineEnding = "\n";
     private bool _resetScrollOnUserInput = true;
     private bool _resetScrollOnServerOutput = false;
+    private DateTime _lastInputSentTime = DateTime.MinValue;
 
     public TerminalEmulator()
     {
@@ -174,7 +176,7 @@ public partial class TerminalEmulator : UserControl
         _fontSize = fontSize;
     }
 
-    public void UpdateSettings(string? lineEnding = null, string? fontFamily = null, double? fontSize = null, string? foregroundColor = null, string? backgroundColor = null, string? bellNotification = null)
+    public void UpdateSettings(string? lineEnding = null, string? fontFamily = null, double? fontSize = null, string? foregroundColor = null, string? backgroundColor = null, string? bellNotification = null, bool? resetScrollOnUserInput = null, bool? resetScrollOnServerOutput = null)
     {
         bool fontChanged = false;
         
@@ -216,6 +218,16 @@ public partial class TerminalEmulator : UserControl
         if (bellNotification != null)
         {
             _bellNotification = bellNotification;
+        }
+        
+        if (resetScrollOnUserInput.HasValue)
+        {
+            _resetScrollOnUserInput = resetScrollOnUserInput.Value;
+        }
+        
+        if (resetScrollOnServerOutput.HasValue)
+        {
+            _resetScrollOnServerOutput = resetScrollOnServerOutput.Value;
         }
         
         if (fontChanged)
@@ -294,7 +306,11 @@ public partial class TerminalEmulator : UserControl
                 
                 if (_resetScrollOnServerOutput && _scrollOffset > 0)
                 {
-                    ResetScrollPosition();
+                    var timeSinceLastInput = (DateTime.Now - _lastInputSentTime).TotalMilliseconds;
+                    if (timeSinceLastInput > ECHO_DETECTION_WINDOW_MS)
+                    {
+                        ResetScrollPosition();
+                    }
                 }
             }
         }));
@@ -1446,6 +1462,8 @@ public partial class TerminalEmulator : UserControl
                 var text = Clipboard.GetText();
                 if (!string.IsNullOrEmpty(text))
                 {
+                    _lastInputSentTime = DateTime.Now;
+                    
                     _ = Task.Run(async () =>
                     {
                         try
@@ -1496,6 +1514,8 @@ public partial class TerminalEmulator : UserControl
             {
                 ResetScrollPosition();
             }
+            
+            _lastInputSentTime = DateTime.Now;
             
             e.Handled = true;
             _ = Task.Run(async () =>
@@ -1677,6 +1697,8 @@ public partial class TerminalEmulator : UserControl
                 ResetScrollPosition();
             }
             
+            _lastInputSentTime = DateTime.Now;
+            
             var seq = sequence;
             _ = Task.Run(async () =>
             {
@@ -1808,6 +1830,8 @@ public partial class TerminalEmulator : UserControl
             {
                 ResetScrollPosition();
             }
+            
+            _lastInputSentTime = DateTime.Now;
             
             try
             {

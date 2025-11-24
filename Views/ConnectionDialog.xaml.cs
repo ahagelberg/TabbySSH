@@ -304,6 +304,7 @@ public partial class ConnectionDialog : Window
 
         Configuration = new SshSessionConfiguration
         {
+            Id = _existingConfig?.Id ?? Guid.NewGuid().ToString(),
             Host = HostTextBox.Text,
             Port = port,
             Username = UsernameTextBox.Text,
@@ -330,6 +331,8 @@ public partial class ConnectionDialog : Window
             Color = _selectedAccentColor,
             LineEnding = ConvertLineEndingString(LineEndingComboBox.SelectedItem is ComboBoxItem item && item.Tag is string tag ? tag : "\n"),
             Encoding = _existingConfig?.Encoding ?? "UTF-8",
+            Group = _existingConfig?.Group,
+            Order = _existingConfig?.Order ?? 0,
             PortForwardingRules = portForwardingRules,
             FontFamily = string.IsNullOrWhiteSpace(FontFamilyComboBox.Text) ? "Consolas" : FontFamilyComboBox.Text,
                 FontSize = double.TryParse(FontSizeTextBox.Text, out double fontSize) && fontSize > 0 ? fontSize : 12.0,

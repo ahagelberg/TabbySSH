@@ -264,6 +264,8 @@ public partial class TerminalTabItem : TabItem
         SessionConfig.LineEnding = config.LineEnding;
         SessionConfig.BellNotification = config.BellNotification;
         SessionConfig.TerminalResizeMethod = config.TerminalResizeMethod;
+        SessionConfig.ResetScrollOnUserInput = config.ResetScrollOnUserInput;
+        SessionConfig.ResetScrollOnServerOutput = config.ResetScrollOnServerOutput;
         
         TerminalControl.UpdateSettings(
             config.LineEnding,
@@ -271,7 +273,9 @@ public partial class TerminalTabItem : TabItem
             config.FontSize,
             config.ForegroundColor,
             config.BackgroundColor,
-            config.BellNotification);
+            config.BellNotification,
+            config.ResetScrollOnUserInput,
+            config.ResetScrollOnServerOutput);
         
         ApplyColor(config.Color);
     }
