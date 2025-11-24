@@ -1504,7 +1504,8 @@ public partial class TerminalEmulator : UserControl
                 return;
             }
             
-            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+            var modifiers = Keyboard.Modifiers;
+            if (modifiers.HasFlag(ModifierKeys.Control) && !modifiers.HasFlag(ModifierKeys.Alt))
             {
                 e.Handled = true;
                 return;
@@ -1680,7 +1681,7 @@ public partial class TerminalEmulator : UserControl
             sequence = "\x1B[6~";
             e.Handled = true;
         }
-        else if ((modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+        else if ((modifiers & ModifierKeys.Control) == ModifierKeys.Control && (modifiers & ModifierKeys.Alt) != ModifierKeys.Alt)
         {
             var controlChar = GetControlCharacter(key);
             if (controlChar.HasValue)
