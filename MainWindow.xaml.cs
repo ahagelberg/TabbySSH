@@ -22,9 +22,6 @@ public partial class MainWindow : Window
     private readonly ConfigurationManager _configManager;
     private readonly SessionManager _sessionManager;
     private ApplicationSettings _appSettings;
-    private bool _isDragging = false;
-    private Point _dragStartPoint;
-    private Point _windowStartPoint;
     private Adorner? _tabDropIndicator;
     private TerminalTabItem? _draggedTab;
 
@@ -655,11 +652,6 @@ public partial class MainWindow : Window
 
     private void TitleBar_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (_isDragging)
-        {
-            return;
-        }
-
         var source = e.OriginalSource as DependencyObject;
         if (source == null)
         {
@@ -685,10 +677,7 @@ public partial class MainWindow : Window
                 }
                 else
                 {
-                    _isDragging = true;
-                    _dragStartPoint = PointToScreen(e.GetPosition(this));
-                    _windowStartPoint = new Point(Left, Top);
-                    CaptureMouse();
+                    DragMove();
                     e.Handled = true;
                 }
                 return;
@@ -717,36 +706,6 @@ public partial class MainWindow : Window
             }
 
             current = parent;
-        }
-    }
-
-    protected override void OnMouseMove(MouseEventArgs e)
-    {
-        if (_isDragging && e.LeftButton == MouseButtonState.Pressed)
-        {
-            var currentScreenPos = PointToScreen(e.GetPosition(this));
-            var diff = currentScreenPos - _dragStartPoint;
-            
-            Left = _windowStartPoint.X + diff.X;
-            Top = _windowStartPoint.Y + diff.Y;
-        }
-        else if (_isDragging && e.LeftButton == MouseButtonState.Released)
-        {
-            _isDragging = false;
-            ReleaseMouseCapture();
-        }
-        
-        base.OnMouseMove(e);
-    }
-
-    protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
-    {
-        base.OnMouseLeftButtonUp(e);
-        
-        if (_isDragging)
-        {
-            _isDragging = false;
-            ReleaseMouseCapture();
         }
     }
 
