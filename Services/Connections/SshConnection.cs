@@ -6,8 +6,18 @@ using System.Text;
 using Renci.SshNet;
 using Renci.SshNet.Common;
 using TabbySSH.Models;
+using TabbySSH.Services;
 
 namespace TabbySSH.Services.Connections;
+
+public delegate HostKeyVerificationResult HostKeyVerificationCallback(string host, int port, string keyAlgorithm, string fingerprint, bool isChanged);
+
+public enum HostKeyVerificationResult
+{
+    Cancel,
+    AcceptOnce,
+    AcceptAndAdd
+}
 
 public class SshConnection : ITerminalConnection
 {
@@ -22,6 +32,8 @@ public class SshConnection : ITerminalConnection
     private readonly string _username;
     private readonly string _password;
     private readonly string _connectionName;
+    private readonly KnownHostsManager? _knownHostsManager;
+    private readonly HostKeyVerificationCallback? _hostKeyVerificationCallback;
 
     public bool IsConnected => _sshClient?.IsConnected ?? false;
     public string ConnectionName => _connectionName;
@@ -30,7 +42,7 @@ public class SshConnection : ITerminalConnection
     public event EventHandler<ConnectionClosedEventArgs>? ConnectionClosed;
     public event EventHandler<string>? ErrorOccurred;
 
-    public SshConnection(SshSessionConfiguration config)
+    public SshConnection(SshSessionConfiguration config, KnownHostsManager? knownHostsManager = null, HostKeyVerificationCallback? hostKeyVerificationCallback = null)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _host = config.Host ?? throw new ArgumentNullException(nameof(config.Host));
@@ -38,6 +50,8 @@ public class SshConnection : ITerminalConnection
         _username = config.Username ?? throw new ArgumentNullException(nameof(config.Username));
         _password = config.Password ?? string.Empty;
         _connectionName = config.Name ?? throw new ArgumentNullException(nameof(config.Name));
+        _knownHostsManager = knownHostsManager;
+        _hostKeyVerificationCallback = hostKeyVerificationCallback;
     }
 
     public async Task<bool> ConnectAsync()
@@ -79,8 +93,109 @@ public class SshConnection : ITerminalConnection
                 System.Console.WriteLine("[SshConnection] Compression requested but not yet implemented in SSH.NET");
             }
 
+            bool hostKeyAccepted = false;
+            string? receivedFingerprint = null;
+            string? receivedKeyAlgorithm = null;
+            Exception? hostKeyException = null;
+
             _sshClient = new SshClient(connectionInfo);
-            await Task.Run(() => _sshClient.Connect());
+            
+            ((BaseClient)_sshClient).HostKeyReceived += (sender, e) =>
+            {
+                receivedFingerprint = string.Join("", e.FingerPrint.Select(b => b.ToString("x2")));
+                receivedKeyAlgorithm = DetermineKeyAlgorithm(e.FingerPrint);
+
+                if (_knownHostsManager != null)
+                {
+                    var knownHost = _knownHostsManager.GetKnownHost(_host, _port);
+                    if (knownHost != null)
+                    {
+                        if (knownHost.Fingerprint == receivedFingerprint)
+                        {
+                            e.CanTrust = true;
+                            hostKeyAccepted = true;
+                            return;
+                        }
+                        else
+                        {
+                            e.CanTrust = false;
+                            if (_hostKeyVerificationCallback != null)
+                            {
+                                var result = _hostKeyVerificationCallback(_host, _port, receivedKeyAlgorithm, receivedFingerprint, true);
+                                if (result == HostKeyVerificationResult.AcceptAndAdd)
+                                {
+                                    _knownHostsManager.AddKnownHost(_host, _port, receivedFingerprint, receivedKeyAlgorithm);
+                                    e.CanTrust = true;
+                                    hostKeyAccepted = true;
+                                }
+                                else if (result == HostKeyVerificationResult.AcceptOnce)
+                                {
+                                    e.CanTrust = true;
+                                    hostKeyAccepted = true;
+                                }
+                                else
+                                {
+                                    e.CanTrust = false;
+                                    hostKeyAccepted = false;
+                                }
+                            }
+                            else
+                            {
+                                e.CanTrust = false;
+                                hostKeyAccepted = false;
+                            }
+                            return;
+                        }
+                    }
+                }
+
+                if (_hostKeyVerificationCallback != null)
+                {
+                    var result = _hostKeyVerificationCallback(_host, _port, receivedKeyAlgorithm, receivedFingerprint, false);
+                    if (result == HostKeyVerificationResult.AcceptAndAdd)
+                    {
+                        _knownHostsManager?.AddKnownHost(_host, _port, receivedFingerprint, receivedKeyAlgorithm);
+                        e.CanTrust = true;
+                        hostKeyAccepted = true;
+                    }
+                    else if (result == HostKeyVerificationResult.AcceptOnce)
+                    {
+                        e.CanTrust = true;
+                        hostKeyAccepted = true;
+                    }
+                    else
+                    {
+                        e.CanTrust = false;
+                        hostKeyAccepted = false;
+                    }
+                }
+                else
+                {
+                    e.CanTrust = false;
+                    hostKeyAccepted = false;
+                }
+            };
+
+            try
+            {
+                await Task.Run(() => _sshClient.Connect());
+            }
+            catch (SshConnectionException ex)
+            {
+                if (!hostKeyAccepted && receivedFingerprint != null)
+                {
+                    hostKeyException = ex;
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            if (!hostKeyAccepted && receivedFingerprint != null)
+            {
+                throw new SshConnectionException("Host key verification failed or was cancelled.", hostKeyException);
+            }
 
             if (_sshClient.IsConnected)
             {
@@ -113,6 +228,24 @@ public class SshConnection : ITerminalConnection
             ErrorOccurred?.Invoke(this, ex.Message);
             return false;
         }
+    }
+
+    private static string DetermineKeyAlgorithm(byte[] fingerprint)
+    {
+        if (fingerprint == null || fingerprint.Length == 0)
+        {
+            return "unknown";
+        }
+
+        int length = fingerprint.Length;
+        return length switch
+        {
+            16 => "ssh-rsa",
+            20 => "ssh-rsa",
+            32 => "ssh-ed25519",
+            64 => "ssh-ed25519",
+            _ => $"ssh-key-{length * 8}-bit"
+        };
     }
 
     private async Task SetupPortForwarding()

@@ -21,6 +21,7 @@ public partial class MainWindow : Window
 
     private readonly ConfigurationManager _configManager;
     private readonly SessionManager _sessionManager;
+    private readonly KnownHostsManager _knownHostsManager;
     private ApplicationSettings _appSettings;
     private Adorner? _tabDropIndicator;
     private TerminalTabItem? _draggedTab;
@@ -36,6 +37,7 @@ public partial class MainWindow : Window
         
         _configManager = new ConfigurationManager();
         _sessionManager = new SessionManager(_configManager);
+        _knownHostsManager = new KnownHostsManager(_configManager);
         
         _appSettings = LoadApplicationSettings();
         
@@ -296,7 +298,7 @@ public partial class MainWindow : Window
                 _sessionManager.AddSession(config);
             }
 
-            var connection = ConnectionFactory.CreateConnection(config);
+            var connection = ConnectionFactory.CreateConnection(config, _knownHostsManager, ShowHostKeyVerificationDialog);
             string? lastError = null;
             connection.ErrorOccurred += (sender, error) =>
             {
@@ -622,7 +624,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            var connection = ConnectionFactory.CreateConnection(config);
+            var connection = ConnectionFactory.CreateConnection(config, _knownHostsManager, ShowHostKeyVerificationDialog);
             string? lastError = null;
             connection.ErrorOccurred += (sender, error) =>
             {
@@ -819,6 +821,26 @@ public partial class MainWindow : Window
             };
             timer.Start();
         }));
+    }
+
+    private HostKeyVerificationResult ShowHostKeyVerificationDialog(string host, int port, string keyAlgorithm, string fingerprint, bool isChanged)
+    {
+        HostKeyVerificationResult result = HostKeyVerificationResult.Cancel;
+        
+        Dispatcher.Invoke(() =>
+        {
+            var dialog = new HostKeyVerificationDialog(host, port, keyAlgorithm, fingerprint, isChanged)
+            {
+                Owner = this
+            };
+            
+            if (dialog.ShowDialog() == true)
+            {
+                result = dialog.Result;
+            }
+        });
+        
+        return result;
     }
 
     protected override async void OnClosed(EventArgs e)

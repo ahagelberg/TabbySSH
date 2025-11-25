@@ -1,0 +1,96 @@
+<Window x:Class="TabbySSH.Views.HostKeyVerificationDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="SSH Host Key Verification" Height="400" Width="600"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="{DynamicResource WindowBackground}">
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="32" ResizeBorderThickness="4" GlassFrameThickness="0"/>
+    </WindowChrome.WindowChrome>
+    <Border BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" Background="{DynamicResource WindowBackground}">
+        <Grid Margin="20" Background="{DynamicResource WindowBackground}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Text="SSH Host Key Verification" FontSize="16" FontWeight="Bold" Margin="0,0,0,15" Foreground="{DynamicResource WindowForeground}"/>
+
+            <StackPanel Grid.Row="1" Margin="0,0,0,20">
+                <TextBlock TextWrapping="Wrap" Margin="0,0,0,15" Foreground="{DynamicResource WindowForeground}">
+                    <Run Text="The server's host key is not cached in the registry. You have no guarantee that the server is the computer you think it is."/>
+                </TextBlock>
+                
+                <TextBlock TextWrapping="Wrap" Margin="0,0,0,10" FontWeight="Bold" Foreground="{DynamicResource WindowForeground}">
+                    <Run Text="Server's host key:"/>
+                </TextBlock>
+                
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Host:" Margin="0,0,10,0" Foreground="{DynamicResource WindowForeground}"/>
+                    <TextBlock Grid.Column="1" x:Name="HostTextBlock" FontWeight="Bold" Foreground="{DynamicResource WindowForeground}"/>
+                </Grid>
+                
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Key algorithm:" Margin="0,0,10,0" Foreground="{DynamicResource WindowForeground}"/>
+                    <TextBlock Grid.Column="1" x:Name="KeyAlgorithmTextBlock" FontWeight="Bold" Foreground="{DynamicResource WindowForeground}"/>
+                </Grid>
+                
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Fingerprint:" Margin="0,0,10,0" Foreground="{DynamicResource WindowForeground}"/>
+                    <TextBlock Grid.Column="1" x:Name="FingerprintTextBlock" FontFamily="Consolas" FontWeight="Bold" Foreground="{DynamicResource WindowForeground}"/>
+                </Grid>
+                
+                <TextBlock x:Name="ChangedWarningTextBlock" TextWrapping="Wrap" Margin="0,15,0,0" Foreground="{DynamicResource ErrorForeground}" FontWeight="Bold" Visibility="Collapsed">
+                    <Run Text="WARNING: The host key has changed! This may indicate a man-in-the-middle attack."/>
+                </TextBlock>
+                
+                <TextBlock TextWrapping="Wrap" Margin="0,15,0,0" Foreground="{DynamicResource WindowForeground}">
+                    <Run Text="If you trust this host, click 'Accept and Add to Known Hosts' to add the key to your cache and carry on connecting."/>
+                </TextBlock>
+                
+                <TextBlock TextWrapping="Wrap" Margin="0,5,0,0" Foreground="{DynamicResource WindowForeground}">
+                    <Run Text="If you want to carry on connecting just once, without adding the key to the cache, click 'Accept Once'."/>
+                </TextBlock>
+            </StackPanel>
+
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="1" Content="Accept and Add to Known Hosts" x:Name="AcceptButton" 
+                        Click="AcceptButton_Click" Padding="15,5" Margin="0,0,10,0" IsDefault="True"
+                        Background="{DynamicResource ButtonBackground}" Foreground="{DynamicResource ButtonForeground}"
+                        BorderBrush="{DynamicResource ButtonBorder}"/>
+                <Button Grid.Column="2" Content="Accept Once" x:Name="AcceptOnceButton" 
+                        Click="AcceptOnceButton_Click" Padding="15,5" Margin="0,0,10,0"
+                        Background="{DynamicResource ButtonBackground}" Foreground="{DynamicResource ButtonForeground}"
+                        BorderBrush="{DynamicResource ButtonBorder}"/>
+                <Button Grid.Column="3" Content="Cancel" x:Name="CancelButton" 
+                        Click="CancelButton_Click" Padding="15,5" IsCancel="True"
+                        Background="{DynamicResource ButtonBackground}" Foreground="{DynamicResource ButtonForeground}"
+                        BorderBrush="{DynamicResource ButtonBorder}"/>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>
+
