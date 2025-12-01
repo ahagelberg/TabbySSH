@@ -101,7 +101,23 @@ public class Vt100Emulator
             {
                 if (i < oldRows && j < oldCols)
                 {
-                    row.Add(oldScreen[i][j]);
+                    var oldCell = oldScreen[i][j];
+                    row.Add(new TerminalCell
+                    {
+                        Character = oldCell.Character,
+                        ForegroundColor = oldCell.ForegroundColor,
+                        BackgroundColor = oldCell.BackgroundColor,
+                        Bold = oldCell.Bold,
+                        Faint = oldCell.Faint,
+                        Italic = oldCell.Italic,
+                        Underline = oldCell.Underline,
+                        Blink = oldCell.Blink,
+                        Reverse = oldCell.Reverse,
+                        Conceal = oldCell.Conceal,
+                        CrossedOut = oldCell.CrossedOut,
+                        DoubleUnderline = oldCell.DoubleUnderline,
+                        Overline = oldCell.Overline
+                    });
                 }
                 else
                 {
@@ -111,6 +127,8 @@ public class Vt100Emulator
             _screen.Add(row);
         }
 
+        _scrollTop = 0;
+        _scrollBottom = -1;
         EnsureCursorInBounds();
         ScreenChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -133,6 +151,12 @@ public class Vt100Emulator
             return new TerminalCell();
         }
 
+        EnsureRowHasCells(row);
+        if (col >= _screen[row].Count)
+        {
+            return new TerminalCell();
+        }
+
         return _screen[row][col];
     }
 
@@ -143,7 +167,13 @@ public class Vt100Emulator
             return new TerminalCell();
         }
 
-        return _scrollback[row][col];
+        var line = _scrollback[row];
+        if (col >= line.Count)
+        {
+            return new TerminalCell();
+        }
+
+        return line[col];
     }
 
     public string GetLine(int row)
@@ -260,6 +290,12 @@ public class Vt100Emulator
             case 'T':
                 ScrollDown(GetCursorMoveAmount(p));
                 break;
+            case 'L':
+                InsertLines(GetCursorMoveAmount(p));
+                break;
+            case 'M':
+                DeleteLines(GetCursorMoveAmount(p));
+                break;
             case 'm':
                 ProcessSgr(p);
                 break;
@@ -282,6 +318,23 @@ public class Vt100Emulator
             case 'd':
                 var rowPos = p.Count > 0 && p[0] > 0 ? p[0] - 1 : 0;
                 MoveCursorToRow(rowPos);
+                break;
+            case 'r':
+                if (p.Count >= 2)
+                {
+                    var top = p[0] > 0 ? p[0] - 1 : 0;
+                    var bottom = p[1] > 0 ? p[1] - 1 : _rows - 1;
+                    SetScrollingRegion(top, bottom);
+                }
+                else if (p.Count == 1)
+                {
+                    var top = p[0] > 0 ? p[0] - 1 : 0;
+                    SetScrollingRegion(top, _rows - 1);
+                }
+                else
+                {
+                    SetScrollingRegion(0, _rows - 1);
+                }
                 break;
             case 'X':
                 EraseCharacters(GetCursorMoveAmount(p));
@@ -346,7 +399,7 @@ public class Vt100Emulator
 
         if (_cursorRow >= 0 && _cursorRow < _rows && _cursorCol >= 0 && _cursorCol < _cols)
         {
-            var writeCol = _cursorCol;
+            EnsureRowHasCells(_cursorRow);
             var cell = _screen[_cursorRow][_cursorCol];
             cell.Character = c;
             cell.ForegroundColor = _reverse ? _backgroundColor : _foregroundColor;
@@ -368,15 +421,50 @@ public class Vt100Emulator
         }
     }
 
+    private void EnsureRowHasCells(int row)
+    {
+        if (row < 0 || row >= _screen.Count)
+        {
+            return;
+        }
+
+        var line = _screen[row];
+        while (line.Count < _cols)
+        {
+            line.Add(new TerminalCell());
+        }
+    }
+
     private void NewLine()
     {
-        if (_cursorRow < _rows - 1)
-    {
-        _cursorRow++;
+        int scrollTop = _scrollTop;
+        int scrollBottom = _scrollBottom >= 0 ? _scrollBottom : _rows - 1;
+        
+        if (_cursorRow >= scrollTop && _cursorRow < scrollBottom)
+        {
+            if (_cursorRow < scrollBottom)
+            {
+                _cursorRow++;
+            }
+            else
+            {
+                ScrollUpInRegion();
+            }
+        }
+        else if (_cursorRow == scrollBottom)
+        {
+            ScrollUpInRegion();
         }
         else
         {
-            ScrollUp();
+            if (_cursorRow < _rows - 1)
+            {
+                _cursorRow++;
+            }
+            else
+            {
+                ScrollUp();
+            }
         }
         _cursorCol = 0;
         CursorMoved?.Invoke(this, EventArgs.Empty);
@@ -385,22 +473,90 @@ public class Vt100Emulator
 
     private void ScrollUp()
     {
-        var topLine = _screen[0];
-        _scrollback.Add(new List<TerminalCell>(topLine));
-        TrimScrollback();
-
-        for (int i = 0; i < _rows - 1; i++)
+        int scrollTop = _scrollTop;
+        int scrollBottom = _scrollBottom >= 0 ? _scrollBottom : _rows - 1;
+        
+        if (scrollTop == 0 && scrollBottom == _rows - 1)
         {
-            _screen[i] = _screen[i + 1];
+            var topLine = CopyLine(_screen[scrollTop]);
+            _scrollback.Add(topLine);
+            TrimScrollback();
+
+            for (int i = scrollTop; i < scrollBottom; i++)
+            {
+                _screen[i] = CopyLine(_screen[i + 1]);
+            }
+
+            _screen[scrollBottom] = new List<TerminalCell>();
+            for (int j = 0; j < _cols; j++)
+            {
+                _screen[scrollBottom].Add(new TerminalCell());
+            }
         }
-
-        _screen[_rows - 1] = new List<TerminalCell>();
-        for (int j = 0; j < _cols; j++)
+        else
         {
-            _screen[_rows - 1].Add(new TerminalCell());
+            ScrollUpInRegion();
         }
 
         ScreenChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void ScrollUpInRegion()
+    {
+        int scrollTop = _scrollTop;
+        int scrollBottom = _scrollBottom >= 0 ? _scrollBottom : _rows - 1;
+        
+        if (scrollTop == 0)
+        {
+            var topLine = CopyLine(_screen[scrollTop]);
+            _scrollback.Add(topLine);
+            TrimScrollback();
+        }
+
+        for (int i = scrollTop; i < scrollBottom; i++)
+        {
+            _screen[i] = CopyLine(_screen[i + 1]);
+        }
+
+        _screen[scrollBottom] = new List<TerminalCell>();
+        for (int j = 0; j < _cols; j++)
+        {
+            _screen[scrollBottom].Add(new TerminalCell());
+        }
+    }
+
+    private List<TerminalCell> CopyLine(List<TerminalCell> source)
+    {
+        var copy = new List<TerminalCell>(_cols);
+        int sourceCount = Math.Min(source.Count, _cols);
+        
+        for (int i = 0; i < sourceCount; i++)
+        {
+            var cell = source[i];
+            copy.Add(new TerminalCell
+            {
+                Character = cell.Character,
+                ForegroundColor = cell.ForegroundColor,
+                BackgroundColor = cell.BackgroundColor,
+                Bold = cell.Bold,
+                Faint = cell.Faint,
+                Italic = cell.Italic,
+                Underline = cell.Underline,
+                Blink = cell.Blink,
+                Reverse = cell.Reverse,
+                Conceal = cell.Conceal,
+                CrossedOut = cell.CrossedOut,
+                DoubleUnderline = cell.DoubleUnderline,
+                Overline = cell.Overline
+            });
+        }
+        
+        for (int i = sourceCount; i < _cols; i++)
+        {
+            copy.Add(new TerminalCell());
+        }
+        
+        return copy;
     }
 
     private void TrimScrollback()
@@ -420,13 +576,15 @@ public class Vt100Emulator
 
     private void MoveCursorUp(int n)
     {
-        _cursorRow = Math.Max(0, _cursorRow - n);
+        int scrollTop = _scrollTop;
+        _cursorRow = Math.Max(scrollTop, _cursorRow - n);
         CursorMoved?.Invoke(this, EventArgs.Empty);
     }
 
     private void MoveCursorDown(int n)
     {
-        _cursorRow = Math.Min(_rows - 1, _cursorRow + n);
+        int scrollBottom = _scrollBottom >= 0 ? _scrollBottom : _rows - 1;
+        _cursorRow = Math.Min(scrollBottom, _cursorRow + n);
         CursorMoved?.Invoke(this, EventArgs.Empty);
     }
 
@@ -475,23 +633,37 @@ public class Vt100Emulator
         }
     }
 
+    private void SetScrollingRegion(int top, int bottom)
+    {
+        _scrollTop = Math.Max(0, Math.Min(top, _rows - 1));
+        _scrollBottom = Math.Max(_scrollTop, Math.Min(bottom, _rows - 1));
+        _cursorRow = Math.Max(_scrollTop, Math.Min(_cursorRow, _scrollBottom));
+        EnsureCursorInBounds();
+    }
+
     private void ScrollDown(int n)
     {
+        int scrollTop = _scrollTop;
+        int scrollBottom = _scrollBottom >= 0 ? _scrollBottom : _rows - 1;
+        
         for (int i = 0; i < n; i++)
         {
-            var bottomLine = _screen[_rows - 1];
-            _scrollback.Insert(0, new List<TerminalCell>(bottomLine));
-            TrimScrollback();
-
-            for (int j = _rows - 1; j > 0; j--)
+            if (scrollTop == 0 && scrollBottom == _rows - 1)
             {
-                _screen[j] = _screen[j - 1];
+                var bottomLine = CopyLine(_screen[scrollBottom]);
+                _scrollback.Insert(0, bottomLine);
+                TrimScrollback();
             }
 
-            _screen[0] = new List<TerminalCell>();
+            for (int j = scrollBottom; j > scrollTop; j--)
+            {
+                _screen[j] = CopyLine(_screen[j - 1]);
+            }
+
+            _screen[scrollTop] = new List<TerminalCell>();
             for (int k = 0; k < _cols; k++)
             {
-                _screen[0].Add(new TerminalCell());
+                _screen[scrollTop].Add(new TerminalCell());
             }
         }
         ScreenChanged?.Invoke(this, EventArgs.Empty);
@@ -544,6 +716,8 @@ public class Vt100Emulator
     private bool _cursorVisible = true;
     private bool _alternativeScreen = false;
     private bool _bracketedPaste = false;
+    private int _scrollTop = 0;
+    private int _scrollBottom = -1;
 
     private void ProcessModeChange(AnsiCommand command, bool set)
     {
@@ -558,6 +732,9 @@ public class Vt100Emulator
             if (param == 25)
             {
                 _cursorVisible = set;
+            }
+            else if (param == 12)
+            {
             }
             else if (param == 1049)
             {
@@ -1012,8 +1189,52 @@ public class Vt100Emulator
 
     private void EnsureCursorInBounds()
     {
-        _cursorRow = Math.Max(0, Math.Min(_cursorRow, _rows - 1));
+        int scrollTop = _scrollTop;
+        int scrollBottom = _scrollBottom >= 0 ? _scrollBottom : _rows - 1;
+        _cursorRow = Math.Max(scrollTop, Math.Min(_cursorRow, scrollBottom));
         _cursorCol = Math.Max(0, Math.Min(_cursorCol, _cols - 1));
+    }
+
+    private void InsertLines(int count)
+    {
+        int scrollTop = _scrollTop;
+        int scrollBottom = _scrollBottom >= 0 ? _scrollBottom : _rows - 1;
+        
+        for (int i = 0; i < count; i++)
+        {
+            for (int j = scrollBottom; j > _cursorRow; j--)
+            {
+                _screen[j] = CopyLine(_screen[j - 1]);
+            }
+
+            _screen[_cursorRow] = new List<TerminalCell>();
+            for (int k = 0; k < _cols; k++)
+            {
+                _screen[_cursorRow].Add(new TerminalCell());
+            }
+        }
+        ScreenChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void DeleteLines(int count)
+    {
+        int scrollTop = _scrollTop;
+        int scrollBottom = _scrollBottom >= 0 ? _scrollBottom : _rows - 1;
+        
+        for (int i = 0; i < count; i++)
+        {
+            for (int j = _cursorRow; j < scrollBottom; j++)
+            {
+                _screen[j] = CopyLine(_screen[j + 1]);
+            }
+
+            _screen[scrollBottom] = new List<TerminalCell>();
+            for (int k = 0; k < _cols; k++)
+            {
+                _screen[scrollBottom].Add(new TerminalCell());
+            }
+        }
+        ScreenChanged?.Invoke(this, EventArgs.Empty);
     }
 }
 
