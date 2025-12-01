@@ -154,16 +154,76 @@ public partial class MainWindow : Window
             return;
         }
 
-        foreach (var sessionInfo in activeSessions.OrderBy(s => s.TabIndex))
+        var orderedSessions = activeSessions.OrderBy(s => s.TabIndex).ToList();
+        var tabs = new List<(TerminalTabItem tab, SshSessionConfiguration config, ITerminalConnection connection)>();
+        
+        foreach (var sessionInfo in orderedSessions)
         {
             var session = _sessionManager.GetSession(sessionInfo.SessionId);
             if (session is SshSessionConfiguration sshConfig)
             {
-                await CreateNewTab(sshConfig);
+                var existingSession = _sessionManager.GetSession(sshConfig.Id);
+                if (existingSession == null && !string.IsNullOrEmpty(sshConfig.Name))
+                {
+                    _sessionManager.AddSession(sshConfig);
+                }
+
+                var connection = ConnectionFactory.CreateConnection(sshConfig, _knownHostsManager, ShowHostKeyVerificationDialog);
+                string? lastError = null;
+                connection.ErrorOccurred += (sender, error) =>
+                {
+                    lastError = error;
+                    OnErrorOccurred(sender, error);
+                };
+
+                var tab = new TerminalTabItem();
+                TerminalTabs.Items.Add(tab);
+                tab.AttachConnection(connection, sshConfig.Color, sshConfig);
+                
+                tabs.Add((tab, sshConfig, connection));
             }
         }
         
-        UpdateTitleBarColor();
+        if (tabs.Count > 0)
+        {
+            TerminalTabs.SelectedItem = tabs[0].tab;
+            UpdateTitleBarColor();
+            
+            var connectTasks = tabs.Select(async item =>
+            {
+                try
+                {
+                    var connected = await item.connection.ConnectAsync();
+                    if (connected)
+                    {
+                        item.tab.SetConnected();
+                    }
+                    else
+                    {
+                        await Dispatcher.InvokeAsync(() =>
+                        {
+                            TerminalTabs.Items.Remove(item.tab);
+                            item.connection.Dispose();
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        TerminalTabs.Items.Remove(item.tab);
+                        item.connection.Dispose();
+                    });
+                }
+            });
+            
+            await Task.WhenAll(connectTasks);
+            
+            if (tabs.Count > 0 && TerminalTabs.Items.Count > 0)
+            {
+                StatusTextBlock.Text = $"Restored {tabs.Count} session(s)";
+            }
+        }
     }
 
     private void OptionsMenuItem_Click(object sender, RoutedEventArgs e)
