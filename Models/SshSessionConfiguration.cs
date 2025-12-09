@@ -43,6 +43,7 @@ public class SshSessionConfiguration : SessionConfiguration
     public bool ResetScrollOnServerOutput { get; set; } = false;
     public string? ScreenSessionName { get; set; }
     public string BackspaceKey { get; set; } = "DEL";
+    public AutoReconnectMode AutoReconnectMode { get; set; } = AutoReconnectMode.OnFocus;
 
     public SshSessionConfiguration()
     {

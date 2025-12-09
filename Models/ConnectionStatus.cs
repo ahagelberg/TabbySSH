@@ -8,3 +8,10 @@ public enum ConnectionStatus
     Error
 }
 
+public enum AutoReconnectMode
+{
+    None,
+    OnDisconnect,
+    OnFocus
+}
+

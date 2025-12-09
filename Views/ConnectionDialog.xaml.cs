@@ -119,6 +119,14 @@ public partial class ConnectionDialog : Window
             _ => 0
         };
         
+        AutoReconnectComboBox.SelectedIndex = existingConfig.AutoReconnectMode switch
+        {
+            AutoReconnectMode.None => 0,
+            AutoReconnectMode.OnDisconnect => 1,
+            AutoReconnectMode.OnFocus => 2,
+            _ => 0
+        };
+        
         if (existingConfig.PortForwardingRules != null && existingConfig.PortForwardingRules.Count > 0)
         {
             var collection = PortForwardingDataGrid.ItemsSource as ObservableCollection<PortForwardingRule>;
@@ -347,7 +355,14 @@ public partial class ConnectionDialog : Window
                 FontSize = double.TryParse(FontSizeTextBox.Text, out double fontSize) && fontSize > 0 ? fontSize : 12.0,
             ForegroundColor = _selectedForegroundColor,
             BackgroundColor = _selectedBackgroundColor,
-            BackspaceKey = BackspaceKeyComboBox.SelectedItem is ComboBoxItem backspaceItem && backspaceItem.Tag is string backspaceTag ? backspaceTag : "DEL"
+            BackspaceKey = BackspaceKeyComboBox.SelectedItem is ComboBoxItem backspaceItem && backspaceItem.Tag is string backspaceTag ? backspaceTag : "DEL",
+            AutoReconnectMode = AutoReconnectComboBox.SelectedIndex switch
+            {
+                0 => AutoReconnectMode.None,
+                1 => AutoReconnectMode.OnDisconnect,
+                2 => AutoReconnectMode.OnFocus,
+                _ => AutoReconnectMode.None
+            }
         };
 
         DialogResult = true;
