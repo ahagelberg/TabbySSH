@@ -335,6 +335,9 @@ public class Vt100Emulator
             case 'm':
                 ProcessSgr(p);
                 break;
+            case 't':
+                // Window manipulation (DECSLPP / xterm window ops) – not supported; ignore.
+                break;
             case 'n':
                 if (p.Count > 0 && p[0] == 6)
                 {
