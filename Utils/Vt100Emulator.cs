@@ -385,8 +385,11 @@ public class Vt100Emulator
                 InsertCharacters(GetCursorMoveAmount(p));
                 break;
             default:
-                System.Diagnostics.Debug.WriteLine($"[Vt100Emulator] Unhandled CSI command: '{final}'");
-                System.Console.WriteLine($"[Vt100Emulator] Unhandled CSI command: '{final}'");
+                var paramStr = p.Count > 0 ? string.Join(";", p) : "";
+                var commandStr = $"\x1B[{paramStr}{final}";
+                var escapedStr = AnsiParser.EscapeString(commandStr);
+                System.Diagnostics.Debug.WriteLine($"[Vt100Emulator] Unhandled CSI command: {escapedStr}");
+                System.Console.WriteLine($"[Vt100Emulator] Unhandled CSI command: {escapedStr}");
                 break;
         }
     }

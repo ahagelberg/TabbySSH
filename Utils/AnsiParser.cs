@@ -29,7 +29,7 @@ public class AnsiParser
         }
     }
 
-    private static string EscapeString(string s)
+    public static string EscapeString(string s)
     {
         var sb = new StringBuilder();
         foreach (var c in s)
