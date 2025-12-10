@@ -2,7 +2,7 @@ namespace TabbySSH;
 
 public static class VersionInfo
 {
-    public const string Version = "0.2.0";
+    public const string Version = "0.2.1";
     public const string ProgramName = "TabbySSH";
     public const string Creator = "Andreas Hagelberg";
     public const string Copyright = "Copyright © 2025";
