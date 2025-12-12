@@ -447,8 +447,8 @@ public class Vt100Emulator
             EnsureRowHasCells(_cursorRow);
             var cell = _screen[_cursorRow][_cursorCol];
             cell.Character = c;
-            cell.ForegroundColor = _reverse ? _backgroundColor : _foregroundColor;
-            cell.BackgroundColor = _reverse ? _foregroundColor : _backgroundColor;
+            cell.ForegroundColor = _foregroundColor;
+            cell.BackgroundColor = _backgroundColor;
             cell.Bold = _bold;
             cell.Faint = _faint;
             cell.Italic = _italic;
